@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"example.com/eventmanagement/db"
+)
 
 type Event struct {
 	ID          int
@@ -14,11 +18,42 @@ type Event struct {
 var events = []Event{}
 
 func (e Event) Save() error {
-	//later: add it to the DB
-	events = append(events, e)
-	return nil
+	query := `
+	INSERT INTO events (name, description, location, datetime, user_id)
+	VALUES (?,?,?,?,?)`
+	stmt, err := db.DB.Prepare(query)
+	if err != nil {
+        return err
+    }
+	defer stmt.Close()
+	result, err := stmt.Exec(e.Name, e.Description, e.Location, e.DateTime, e.UserID)
+	if err != nil {
+        return err
+    }
+
+	id, err := result.LastInsertId()
+	e.ID = int(id)
+	return err
 }
 
-func GetAllEvents() []Event {
-	return events
+func GetAllEvents() ([]Event, error) {
+	query := "SELECT * FROM events"
+	rows, err := db.DB.Query(query)
+	if err!= nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []Event
+
+	for rows.Next() {
+		var event Event
+		err := rows.Scan(&event.ID, &event.Name, &event.Description, &event.Location, &event.DateTime, &event.UserID)
+		if err!= nil {
+            return nil, err
+        }
+
+		events = append(events, event)
+	}
+	return events, nil
 }
